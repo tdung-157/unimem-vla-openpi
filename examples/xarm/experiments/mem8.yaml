@@ -1,0 +1,57 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  task: "mem8"
+  prompt: "put three scoops of beans into the mixing bowl"
+  num_rollouts: 20
+  max_episode_steps: 4000
+  save_keyframes: true
+  out_path: "data/xarm/keyframes"
+  video_encoder: true
+  num_frames: 4
+  event_confidence_threshold: 0.8
+  seed: -1
+  gripper_close_threshold: 0.65
+  gripper_close_snap: 0.83
+
+experiments:
+
+  - name: "mem8_ours"
+    server:
+      config: "xarm_mem8_infer"
+      dir: "checkpoints/xarm_mem8_coruscant/mem8/29999"
+    mode: "text_keyframe"
+
+  - name: "mem8_text"
+    server:
+      config: "xarm_mem8_infer"
+      dir: "checkpoints/xarm_mem8_coruscant/mem8/29999"
+    mode: "text"
+
+  - name: "mem8_base"
+    server:
+      config: "xarm_mem8_infer"
+      dir: "checkpoints/xarm_mem8_coruscant/mem8/29999"
+    mode: "no_memory"
+
+  - name: "mem8_text_only"
+    server:
+      config: "xarm_mem8_text_only_infer"
+      dir: "checkpoints/xarm_mem8_text_only/mem8_txt/29999"
+    mode: "text"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem8_no_memory"
+    server:
+      config: "xarm_mem8_no_memory_infer"
+      dir: "checkpoints/xarm_mem8_no_memory/mem8_nm/29999"
+    mode: "no_memory"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem8_keyframe_only"
+    server:
+      config: "xarm_mem8_keyframe_only_infer"
+      dir: "checkpoints/xarm_mem8_keyframe_only/mem8_kf/29999"
+    mode: "keyframe"

@@ -1,0 +1,56 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  task: "mem10"
+  prompt: "watch the human tap a cup, then put a scoop of beans in that cup"
+  num_rollouts: 25
+  max_episode_steps: 2000
+  save_keyframes: true
+  out_path: "data/xarm/keyframes"
+  video_encoder: true
+  num_frames: 4
+  event_confidence_threshold: 0.8
+  gripper_close_threshold: 0.65
+  gripper_close_snap: 0.83
+
+experiments:
+
+  - name: "mem10_ours"
+    server:
+      config: "xarm_mem10_infer"
+      dir: "checkpoints/xarm_mem10_coruscant/mem10/39999"
+    mode: "text_keyframe"
+
+  - name: "mem10_text"
+    server:
+      config: "xarm_mem10_infer"
+      dir: "checkpoints/xarm_mem10_coruscant/mem10/39999"
+    mode: "text"
+
+  - name: "mem10_base"
+    server:
+      config: "xarm_mem10_infer"
+      dir: "checkpoints/xarm_mem10_coruscant/mem10/39999"
+    mode: "no_memory"
+
+  - name: "mem10_text_only"
+    server:
+      config: "xarm_mem10_text_only_infer"
+      dir: "checkpoints/xarm_mem10_text_only/mem10_txt/39999"
+    mode: "text"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem10_no_memory"
+    server:
+      config: "xarm_mem10_no_memory_infer"
+      dir: "checkpoints/xarm_mem10_no_memory/mem10_nm/39999"
+    mode: "no_memory"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem10_keyframe_only"
+    server:
+      config: "xarm_mem10_keyframe_only_infer"
+      dir: "checkpoints/xarm_mem10_keyframe_only/mem10_kf/39999"
+    mode: "keyframe"

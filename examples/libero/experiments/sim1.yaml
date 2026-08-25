@@ -1,0 +1,36 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 25
+  max_episode_steps: 800
+  save_video: true
+  video_out_path: "data/libero/videos"
+  event_confidence_threshold: 0.8
+  video_encoder: true
+  num_frames: 3
+  scoring:
+    type: "event_completion"
+    vlm_sequence:
+      - "grabbed box"
+      - "retracted"
+      - "placed box"
+  seed: -1
+  infer_every_steps: 10
+  num_steps_wait: 50
+  bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task1_pick_up_and_put_back_down.bddl"
+  server:
+      config: "libero_mem1"
+      dir: "checkpoints/libero_mem1_finetune/mem1/14000"
+
+experiments:
+  - name: "task1_keyframe"
+    mode: "keyframe"
+
+  - name: "task1_text"
+    mode: "text"
+
+  - name: "task1_ours"
+    mode: "text_keyframe"
+
+  - name: "base"
+    mode: "no_memory"

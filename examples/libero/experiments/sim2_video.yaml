@@ -1,0 +1,22 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 25
+  max_episode_steps: 1100
+  save_video: true
+  video_out_path: "data/libero/videos"
+  video_encoder: true
+  num_frames: 4
+  seed: -1
+  infer_every_steps: 10
+  stride_steps: 60
+  num_steps_wait: 50
+  bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task2_pick_up_3.bddl"
+  server:
+    config: "libero_mem2_video_infer"
+    dir: "checkpoints/libero_mem2_video/mem2/19999"
+
+experiments:
+
+  - name: "task2_video"
+    mode: "video"

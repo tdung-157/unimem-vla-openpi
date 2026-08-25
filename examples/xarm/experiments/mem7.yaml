@@ -1,0 +1,56 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  prompt: "measure the length of the hammer using the tape measurer and control the retract to ensure the hook doesn't slam"
+  num_rollouts: 20
+  max_episode_steps: 2000
+  save_keyframes: true
+  out_path: "data/xarm/keyframes"
+  video_encoder: true
+  num_frames: 4
+  event_confidence_threshold: 0.8
+  seed: -1
+  gripper_close_threshold: 0.35
+  gripper_close_snap: 0.75
+
+experiments:
+
+  - name: "mem7_ours"
+    server:
+      config: "xarm_mem7_infer"
+      dir: "checkpoints/xarm_mem7_coruscant/mem7/19999"
+    mode: "text_keyframe"
+
+  - name: "mem7_text"
+    server:
+      config: "xarm_mem7_infer"
+      dir: "checkpoints/xarm_mem7_coruscant/mem7/19999"
+    mode: "text"
+
+  - name: "mem7_base"
+    server:
+      config: "xarm_mem7_infer"
+      dir: "checkpoints/xarm_mem7_coruscant/mem7/19999"
+    mode: "no_memory"
+
+  - name: "mem7_text_only"
+    server:
+      config: "xarm_mem7_text_only_infer"
+      dir: "checkpoints/xarm_mem7_text_only/mem7/19999"
+    mode: "text"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem7_no_memory"
+    server:
+      config: "xarm_mem7_no_memory_infer"
+      dir: "checkpoints/xarm_mem7_no_memory/mem7/19999"
+    mode: "no_memory"
+    video_encoder: false
+    num_frames: 1
+
+  - name: "mem7_keyframe_only"
+    server:
+      config: "xarm_mem7_keyframe_only_infer"
+      dir: "checkpoints/xarm_mem7_keyframe_only/mem7/19999"
+    mode: "keyframe"

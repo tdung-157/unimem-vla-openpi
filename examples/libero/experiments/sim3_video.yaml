@@ -1,0 +1,27 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 12
+  max_episode_steps: 1000
+  save_video: true
+  video_out_path: "data/libero/videos"
+  video_encoder: true
+  num_frames: 4
+  stride_steps: 60
+  seed: -1
+  infer_every_steps: 10
+  num_steps_wait: 50
+  server:
+      config: "libero_mem3_video_infer"
+      dir: "checkpoints/libero_mem3_video/mem3/19999"
+
+experiments:
+
+  - name: "task3_left_video"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_left.bddl"
+    mode: "video"
+
+  - name: "task3_right_video"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_right.bddl"
+    mode: "video"
+    num_rollouts: 13

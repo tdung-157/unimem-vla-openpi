@@ -1,0 +1,34 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 25
+  max_episode_steps: 800
+  save_video: true
+  video_out_path: "data/libero/videos"
+  video_encoder: true
+  num_frames: 4
+  seed: -1
+  infer_every_steps: 10
+  num_steps_wait: 50
+  stride_steps: 60
+  server:
+    config: "libero_mem5_video_infer"
+    dir: "checkpoints/libero_mem5_video/vid5/19999"
+
+experiments:
+
+  - name: "task5_left_base"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task5_search1.bddl"
+    mode: "no_memory"
+
+  - name: "task5_left_video"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task5_search1.bddl"
+    mode: "video"
+
+  - name: "task5_right_base"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task5_search2.bddl"
+    mode: "no_memory"
+
+  - name: "task5_right_video"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task5_search2.bddl"
+    mode: "video"

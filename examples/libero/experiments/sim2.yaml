@@ -1,0 +1,42 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 25
+  max_episode_steps: 1100
+  save_video: true
+  video_out_path: "data/libero/videos"
+  video_encoder: true
+  num_frames: 3
+  event_confidence_threshold: 0.8
+  scoring:
+    type: "event_completion"
+    vlm_sequence:
+      - "grabbed box"
+      - "retracted"
+      - "placed box"
+      - "grabbed box"
+      - "retracted"
+      - "placed box"
+      - "grabbed box"
+      - "retracted"
+      - "placed box"
+  seed: -1
+  infer_every_steps: 5
+  num_steps_wait: 50
+  bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task2_pick_up_3.bddl"
+  server:
+    config: "libero_mem2"
+    dir: "checkpoints/libero_mem2_finetune/mem2/19999"
+
+experiments:
+  - name: "task2_ours"
+    mode: "text_keyframe"
+
+  - name: "task2_text"
+    mode: "text"
+
+  - name: "task2_keyframe"
+    mode: "keyframe"
+
+  - name: "task2_base"
+    mode: "no_memory"

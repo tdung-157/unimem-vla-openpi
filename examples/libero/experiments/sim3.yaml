@@ -1,0 +1,60 @@
+defaults:
+  host: "127.0.0.1"
+  port: 8000
+  num_rollouts: 12
+  max_episode_steps: 1000
+  save_video: true
+  video_out_path: "data/libero/videos"
+  video_encoder: true
+  num_frames: 3
+  event_confidence_threshold: 0.8
+  scoring:
+    type: "drop_tap_match"
+    drop_left: "dropped left"
+    drop_right: "dropped right"
+    tap_left: "tapped left basket"
+    tap_right: "tapped right basket"
+  seed: -1
+  infer_every_steps: 10
+  num_steps_wait: 50
+  server:
+      config: "libero_mem3"
+      dir: "checkpoints/libero_mem3_finetune/mem3/18000"
+
+experiments:
+
+  - name: "task3_left_ours"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_left.bddl"
+    mode: "text_keyframe"
+
+  - name: "task3_left_text"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_left.bddl"
+    mode: "text"
+
+  - name: "task3_right_text"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_right.bddl"
+    mode: "text"
+    num_rollouts: 13
+
+  - name: "task3_left_keyframes"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_left.bddl"
+    mode: "keyframe"
+
+  - name: "task3_right_keyframes"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_right.bddl"
+    mode: "keyframe"
+    num_rollouts: 13
+
+  - name: "task3_right_base"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_right.bddl"
+    mode: "no_memory"
+    num_rollouts: 13
+
+  - name: "task3_left_base"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_left.bddl"
+    mode: "no_memory"
+
+  - name: "task3_right_ours"
+    bddl_file: "../LIBERO/libero/libero/bddl_files/memory/task3_pick_bin_right.bddl"
+    mode: "text_keyframe"
+    num_rollouts: 13
