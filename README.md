@@ -281,12 +281,14 @@ Inference Note: `Policy` auto-detects `model.event_tracking` and returns an
 
 If you use this code, please cite:
 ```bibtex
-@misc{osterberg2026unimem,
-  title        = {UniMem: Unifying Multimodal Memory and Control for VLAs},
-  author       = {Osterberg, Lars and Wang, Maggie and Schwager, Mac},
-  year         = {2026},
-  institution  = {Stanford University},
-  note         = {Preprint}
+@misc{osterberg2026unimemunifyingmultimodalmemory,
+      title={UniMem: Unifying Multimodal Memory and Control for Vision-Language-Action Models}, 
+      author={Lars Osterberg and Maggie Wang and Mac Schwager},
+      year={2026},
+      eprint={2608.22869},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2608.22869}, 
 }
 ```
 
