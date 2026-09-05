@@ -476,7 +476,12 @@ def create_torch_dataset(
                 len(excluded), rid, sorted(excluded), len(episodes), dataset_meta.total_episodes,
             )
 
-        ds = lerobot_dataset.LeRobotDataset(rid, delta_timestamps=delta_timestamps, episodes=episodes)
+        ds = lerobot_dataset.LeRobotDataset(
+            rid,
+            delta_timestamps=delta_timestamps,
+            episodes=episodes,
+            tolerance_s=data_config.video_tolerance_s,
+        )
         if episodes is not None:
             _rekey_episode_data_index(ds, episodes)
 

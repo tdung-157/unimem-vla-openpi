@@ -112,6 +112,14 @@ class DataConfig:
     # If true, will use the LeRobot dataset task to define the prompt.
     prompt_from_task: bool = False
 
+    # Tolerance (seconds) LeRobot allows between a parquet timestamp and the nearest video
+    # PTS when decoding a frame. Some v2.1-converted datasets (e.g. the bimanual coffee sets
+    # under custom_unimem/) have video PTS shifted by up to one frame period against the
+    # parquet timestamps, which trips LeRobot's default 1e-4 s tolerance and aborts the load.
+    # 0.04 covers one 30 fps frame period and is still small enough that it cannot select a
+    # wrong frame. Leave at the LeRobot default unless your dataset actually needs it.
+    video_tolerance_s: float = 1e-4
+
     # Only used for RLDS data loader (ie currently only used for DROID).
     rlds_data_dir: str | None = None
     # Action space for DROID dataset.

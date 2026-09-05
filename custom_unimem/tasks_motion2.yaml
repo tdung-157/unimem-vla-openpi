@@ -1,0 +1,21 @@
+# Ordered prompts for the MOTION2 UniMem policy.
+#
+# The deploy node feeds the CURRENT entry to the model as the language prompt; press 'c'
+# in its terminal to advance (wraps around).
+#
+# For a UniMem checkpoint this list should normally hold exactly ONE entry, matching
+# MOTION2_PROMPT in robot_paths.py. The whole point of event memory is that progress
+# through the task reaches the policy through `phase_history` and the keyframes, not
+# through an instruction that already names the current step — swapping the prompt
+# mid-episode puts the model somewhere it was never trained.
+#
+# The extra subtask strings are kept commented out for A/B-ing against a
+# subtask-conditioned (non-UniMem) checkpoint on the same robot.
+tasks:
+  - "get coffee, get ice, serve the drink"
+  # - "Left arm pick the cup and place it under the coffee faucet"
+  # - "Left arm push the coffee lever"
+  # - "Left arm pick up the coffee faucet and hold it under the milk faucet"
+  # - "Right arm press the milk lever"
+  # - "Left arm place the cup down"
+  # - "Right arm bring the cup to the serving area"

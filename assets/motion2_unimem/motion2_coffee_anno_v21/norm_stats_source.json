@@ -1,0 +1,8 @@
+{
+  "repo_ids": [
+    "lrb_new_format/coffee_aligned_anno_data_v21"
+  ],
+  "frames": 817315,
+  "action_horizon": 50,
+  "config": "pi05_motion2_unimem_event_lora"
+}

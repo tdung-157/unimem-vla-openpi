@@ -20,6 +20,13 @@ exactly which files changed), plus two evaluation domains used in the paper:
 - [`examples/libero`](examples/libero) — memory-conditioned LIBERO simulation experiments
 - [`examples/xarm`](examples/xarm) — memory-conditioned real-robot xArm experiments
 
+This checkout adds a third domain of its own:
+- [`custom_unimem`](custom_unimem) — **UniMem on the bimanual Astribot and MOTION2
+  robots.** Both of those datasets already annotate every frame with its subtask, so event
+  labels come from subtask transitions instead of hand-written signal detectors; the
+  directory holds the labeler, the data/train configs, and the two ROS2 deploy nodes.
+  Start at [`custom_unimem/README.md`](custom_unimem/README.md).
+
 ### Pipeline overview
 
 This fork adds "event memory" to base π₀/π₀.₅: the policy can detect semantic events
@@ -95,8 +102,8 @@ openpi/
 │       │   └── xarm_policy.py                 # XarmInputs/XarmOutputs — this fork's xArm-memory observation/action mapping
 │       │
 │       └── training/
-│           ├── config.py                      # TrainConfig + DataConfigFactory registry — unimem_example_* templates plus every real libero_mem*/xarm_mem* config, all live here
-│           ├── data_loader.py                 # LeRobot dataset loading/batching, event-history + keyframe sampling, text/event dropout
+│           ├── config.py                      # TrainConfig + DataConfigFactory registry — unimem_example_* templates plus every real libero_mem*/xarm_mem* config, all live here; DataConfig.video_tolerance_s restored for the bimanual datasets (see custom_unimem/README.md)
+│           ├── data_loader.py                 # LeRobot dataset loading/batching, event-history + keyframe sampling, text/event dropout; passes video_tolerance_s to LeRobotDataset
 │           ├── weight_loaders.py              # base-checkpoint weight loading for fine-tuning (incl. missing-param regex for lora/phase_head/temporal)
 │           └── lerobot_hf_patch.py            # patches a LeRobot HF-transform quirk before LeRobotDataset import
 │
@@ -123,10 +130,22 @@ openpi/
 │       ├── demo_collection.py                 # teleoperated demo recording → LeRobot dataset (arm IP/camera serials are CLI flags; repo name/task description are per-session constants in the file)
 │       └── experiments/                       # mem7.yaml..mem10.yaml — one batch config per xArm memory task
 │
-└── benchmarks/                                # latency benchmarking: cost of visual history (base / naive video / keyframe-caching)
-    ├── README.md                              # methodology and the three comparison modes
-    ├── benchmark_two_cameras.py               # latency vs. context length, 2-camera xArm rig config
-    └── benchmark_four_cameras.py              # same, replicated for a 4-camera rig
+├── benchmarks/                                # latency benchmarking: cost of visual history (base / naive video / keyframe-caching)
+│   ├── README.md                              # methodology and the three comparison modes
+│   ├── benchmark_two_cameras.py               # latency vs. context length, 2-camera xArm rig config
+│   └── benchmark_four_cameras.py              # same, replicated for a 4-camera rig
+│
+└── custom_unimem/                             # ★ this checkout's bimanual robots (Astribot + MOTION2) — see its README
+    ├── README.md                              # the full walkthrough: label -> norm stats -> train -> serve -> deploy, plus the gotchas
+    ├── robot_paths.py                         # dataset roots / repo ids / prompts (imports nothing, shared by the labeler and the ROS nodes)
+    ├── event_vocab.py                         # event ids, completion phrases, subtask-prefix matching, "History: ..." rendering
+    ├── label_dataset_subtasks.py              # task_index transitions -> the `labels` + `phase_history` parquet columns
+    ├── bimanual_policy.py                     # BimanualInputs/Outputs (16-dim, 3 cameras, video-aware) + MemoryDropout
+    ├── data_configs.py                        # three DataConfigFactorys: event / event+keyframe / fixed-stride video
+    ├── robot_configs.py                       # shared TrainConfig builder; astribot_config.py + motion2_config.py supply the constants
+    ├── unimem_client.py                       # client half of UniMem: event detection, history text, cache reset/slide (ROS-free)
+    ├── deploy_{motion2,astribot}_ros2.py      # the two ROS2 deploy nodes
+    └── train.py / serve.py / compute_norm_stats*.py / run_*.sh / sbatch_*.sh
 ```
 
 ## Getting Started with UniMem

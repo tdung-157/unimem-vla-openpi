@@ -1,0 +1,4 @@
+# Ordered prompts for the Astribot UniMem policy. See tasks_motion2.yaml for why this
+# should normally be a single entry matching ASTRIBOT_PROMPT in robot_paths.py.
+tasks:
+  - "Make an iced coffee"

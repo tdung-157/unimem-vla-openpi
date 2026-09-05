@@ -1,0 +1,18 @@
+{
+  "provided": true,
+  "note": "Supplied by hand, not computed by compute_norm_stats*.py. Do not overwrite.",
+  "repo_ids": [
+    "astri_coffee_making_v21_relabel"
+  ],
+  "action_horizon": 50,
+  "delta_action_mask": "make_bool_mask(14, -2)  # 14 joints -> delta, 2 grippers absolute",
+  "cross_checked": {
+    "against": "astri_186_v21_relabel (laptop copy), 264874 frames, full pass",
+    "max_abs_diff": {
+      "state.mean": 0.00057,
+      "state.std": 0.00085,
+      "actions.mean": 0.00087,
+      "actions.std": 0.00053
+    }
+  }
+}
