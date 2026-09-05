@@ -105,9 +105,15 @@ uv run python custom_unimem/preflight.py --robot astribot
 [`preflight.py`](preflight.py) resolves the dataset, checks the v2.1 layout / 30 fps / the
 three cameras / 16-dim state, proves from the data itself that the grippers really are at
 dims 14/15 (comparing per-dim ranges, not just names), maps every subtask string against
-the vocabulary, reports `labels` / `phase_history` coverage, and verifies the norm stats
-were computed from *this* dataset. Everything but the last check needs only numpy +
-pyarrow, so it runs before `uv sync` finishes.
+the vocabulary, reports `labels` / `phase_history` coverage, verifies the norm stats were
+computed from *this* dataset, and confirms the `gs://` assets training needs are already
+in the local openpi cache. Nothing in it touches the network, and everything but the last
+two checks needs only numpy + pyarrow, so it runs before `uv sync` finishes.
+
+That last check earns its place: on a compute node with no internet, a missing cached
+asset does not fail — `maybe_download` **hangs**, silently. Set `OPENPI_DATA_HOME` in the
+shell you train from (`sbatch_*.sh` and `run_serve.sh` do it for you; a bare `uv run` does
+not).
 
 ### 1. Derive the event columns from your subtask annotations
 

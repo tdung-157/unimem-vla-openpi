@@ -265,7 +265,17 @@ def main(config: _config.TrainConfig):
         train_state = _checkpoints.restore_state(checkpoint_manager, train_state, data_loader)
 
 # --- GRADIENT ACCUMULATION CONFIG ---
-    GRAD_ACCUM_STEPS = 4
+    # Micro-batches per optimizer step: the effective batch is
+    # config.batch_size * GRAD_ACCUM_STEPS. Set via the environment so the paper's
+    # effective batch can be reproduced on a GPU that cannot hold it in one go
+    # (e.g. batch_size=22 with GRAD_ACCUM_STEPS=2 -> an effective 44).
+    GRAD_ACCUM_STEPS = int(os.environ.get("GRAD_ACCUM_STEPS", "4"))
+    if GRAD_ACCUM_STEPS < 1:
+        raise ValueError(f"GRAD_ACCUM_STEPS must be >= 1, got {GRAD_ACCUM_STEPS}")
+    logging.info(
+        "Gradient accumulation: %d micro-batches of %d -> effective batch %d",
+        GRAD_ACCUM_STEPS, config.batch_size, config.batch_size * GRAD_ACCUM_STEPS,
+    )
 
     trainable_params = train_state.params.filter(config.trainable_filter)
     accumulated_grads = jax.tree.map(jnp.zeros_like, trainable_params)

@@ -9,7 +9,11 @@ Checks, in the order they would bite you:
   4. every subtask string in meta/tasks.jsonl maps to an event in event_vocab.py
   5. the `labels` / `phase_history` columns exist, with a sane event distribution
   6. norm stats exist for the shared asset id AND were computed from this dataset
-     (needs openpi; skipped if unavailable)
+  7. the gs:// assets training needs (base weights, tokenizer) are already in the local
+     openpi cache -- on a node with no internet a miss HANGS inside maybe_download
+     rather than failing, so this check is the difference between one line and a
+     ten-minute silent stall
+     (6 and 7 need openpi; skipped if unavailable. Nothing here touches the network.)
 
 Usage:
     uv run python custom_unimem/preflight.py --robot astribot
@@ -19,6 +23,7 @@ Usage:
 import argparse
 import collections
 import json
+import os
 import pathlib
 import sys
 
@@ -169,38 +174,90 @@ def check_labels(report: Report, files: list[pathlib.Path], vocab: _event_vocab.
         print(f"         {count:>5}  {sequence}")
 
 
-def check_norm_stats(report: Report, robot: str, dataset_frames: int) -> None:
+def _openpi_config(robot: str, report: Report):
+    """Register the custom configs and return openpi's config module, or None.
+
+    Importing openpi is optional — steps 1-5 run on numpy + pyarrow alone, so this can be
+    used before `uv sync` finishes. Registration must happen before `get_config`.
+    """
     try:
         from custom_unimem import _bootstrap
 
         _bootstrap.bootstrap([robot])
         import openpi.training.config as _config
     except ImportError as e:
-        report(WARN, f"openpi not importable ({e}); skipping the norm-stats check")
-        return
+        report(WARN, f"openpi not importable ({e}); skipping the openpi-side checks")
+        return None
+    return _config
 
-    name = f"pi05_{robot}_unimem_event"
-    config = _config.get_config(name)
-    data_config = config.data.create(config.assets_dirs, config.model)
-    if data_config.norm_stats is None:
-        report(FAIL, f"no norm stats for asset '{data_config.asset_id}'")
-        print(f"       -> uv run python custom_unimem/compute_norm_stats_fast.py {name} --verify")
+
+def check_openpi_cache(report: Report, robot: str, _config) -> None:
+    """The gs:// assets training needs must already be in the local openpi cache.
+
+    Compute nodes here have no internet, so a missing asset does not fail — it HANGS,
+    inside `maybe_download`, with no output. Checking first turns a silent ten-minute
+    stall into one line.
+    """
+    cache = pathlib.Path(os.environ.get("OPENPI_DATA_HOME", "~/.cache/openpi")).expanduser()
+    where = "OPENPI_DATA_HOME" if "OPENPI_DATA_HOME" in os.environ else "default (~/.cache/openpi)"
+    report(OK, f"openpi cache: {cache}  [{where}]")
+
+    config = _config.get_config(f"pi05_{robot}_unimem_event")
+    wanted = {"PaliGemma tokenizer": "gs://big_vision/paligemma_tokenizer.model"}
+    params_path = getattr(config.weight_loader, "params_path", None)
+    if params_path:
+        wanted["base weights"] = params_path
+
+    for label, url in wanted.items():
+        if not url.startswith("gs://"):
+            report(OK if pathlib.Path(url).exists() else FAIL, f"{label}: local path {url}")
+            continue
+        local = cache / url[len("gs://") :]
+        if not local.exists():
+            report(FAIL, f"{label} missing from the cache: {local}")
+            print("       -> on a node WITH internet (the login node), run:")
+            print(f"          OPENPI_DATA_HOME={cache} uv run python -c \\")
+            print(
+                f"            \"import openpi.shared.download as d; d.maybe_download('{url}', gs={{'token':'anon'}})\""
+            )
+            print("          Without it, training hangs in maybe_download rather than failing.")
+            continue
+        # openpi deletes and re-downloads anything under openpi-assets/checkpoints/ whose
+        # mtime is on or before 2025-02-03 (see download.py's _INVALIDATE_CACHE_DIRS) —
+        # which on an offline node means a hang, not a refresh.
+        stale = "openpi-assets/checkpoints/" in url and local.stat().st_mtime <= 1738540800
+        report(
+            WARN if stale else OK,
+            f"{label}: {local}"
+            + ("  <- mtime <= 2025-02-03, openpi will try to re-download it; `touch` it" if stale else ""),
+        )
+
+
+def check_norm_stats(report: Report, robot: str, dataset_frames: int, _config) -> None:
+    # Read the stats path directly rather than via data.create(): that builds the model
+    # transforms, which construct the PaliGemma tokenizer, which downloads from gs://.
+    # Preflight must never touch the network.
+    config = _config.get_config(f"pi05_{robot}_unimem_event")
+    asset_id = config.data.assets.asset_id or config.data.repo_id
+    assets_dir = pathlib.Path(config.data.assets.assets_dir or config.assets_dirs)
+    stats_file = assets_dir / asset_id / "norm_stats.json"
+
+    if not stats_file.is_file():
+        report(FAIL, f"no norm stats at {stats_file}")
+        print(f"       -> uv run python custom_unimem/compute_norm_stats_fast.py pi05_{robot}_unimem_event --verify")
         return
-    report(OK, f"norm stats found for asset '{data_config.asset_id}'")
+    report(OK, f"norm stats found: {stats_file}")
 
     # The asset id is shared across configs AND across copies of the same dataset on
     # different machines. That portability is the point, but it also means stats computed
     # from a DIFFERENT dataset would be applied here without complaint, silently
     # normalizing every state and action wrongly. Compare against what was recorded.
-    assets_dir = pathlib.Path(config.data.assets.assets_dir or config.assets_dirs)
-    source_file = assets_dir / data_config.asset_id / _robot_paths.NORM_STATS_SOURCE_FILE
+    source_file = stats_file.parent / _robot_paths.NORM_STATS_SOURCE_FILE
     if not source_file.is_file():
         report(WARN, f"no {_robot_paths.NORM_STATS_SOURCE_FILE} beside the stats — cannot verify what they came from")
         return
     source = json.loads(source_file.read_text())
     if source.get("provided"):
-        # Supplied by hand rather than computed here, so there is no frame count of ours
-        # to compare against. Say so plainly instead of implying a check that never ran.
         report(WARN, f"stats were supplied by hand for {source.get('repo_ids')} — not verified against this dataset")
         if source.get("cross_checked"):
             report(OK, f"  recorded cross-check: {source['cross_checked'].get('against')}")
@@ -212,7 +269,7 @@ def check_norm_stats(report: Report, robot: str, dataset_frames: int) -> None:
         report(OK, f"stats were computed from {recorded} frames of {source.get('repo_ids')} — matches this dataset")
     else:
         report(FAIL, f"stats cover {recorded} frames of {source.get('repo_ids')} but this dataset has {dataset_frames}")
-        print(f"       -> uv run python custom_unimem/compute_norm_stats_fast.py {name} --verify")
+        print(f"       -> uv run python custom_unimem/compute_norm_stats_fast.py pi05_{robot}_unimem_event --verify")
 
 
 def main() -> None:
@@ -250,7 +307,10 @@ def main() -> None:
     check_gripper_layout(report, files)
     check_vocabulary(report, dataset_dir, vocab)
     check_labels(report, files, vocab)
-    check_norm_stats(report, args.robot, int(info["total_frames"]))
+    openpi_config = _openpi_config(args.robot, report)
+    if openpi_config is not None:
+        check_norm_stats(report, args.robot, int(info["total_frames"]), openpi_config)
+        check_openpi_cache(report, args.robot, openpi_config)
 
     print()
     if report.failed:
