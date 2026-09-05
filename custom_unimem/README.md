@@ -156,10 +156,10 @@ Once per robot — all five of that robot's configs read the same shared directo
 
 ```bash
 # fast path: reads the parquet directly, no video decoding (recommended on 817k frames)
-uv run python custom_unimem/compute_norm_stats_fast.py pi05_astribot_unimem_event_full --verify
+uv run python custom_unimem/compute_norm_stats_fast.py pi05_astribot_unimem_event --verify
 
 # or the stock path, sampling a subset
-uv run python custom_unimem/compute_norm_stats.py pi05_astribot_unimem_event_full --max-frames 200000
+uv run python custom_unimem/compute_norm_stats.py pi05_astribot_unimem_event --max-frames 200000
 ```
 
 `--verify` rebuilds the real data pipeline and cross-checks a sample before writing; on
@@ -177,7 +177,7 @@ than implying a check that never ran. The Astribot stats are currently in that s
 
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run python custom_unimem/train.py \
-    pi05_astribot_unimem_event_full --exp-name=coffee_event --overwrite
+    pi05_astribot_unimem_event --exp-name=coffee_event --overwrite
 ```
 
 On the 2x H100 node — every `_full` config is shaped for exactly that allocation, so no
@@ -185,17 +185,27 @@ flags are needed:
 
 ```bash
 # with Slurm
-CONFIG=pi05_astribot_unimem_event_full FAST=1 sbatch custom_unimem/sbatch_norm_stats.sh
-CONFIG=pi05_astribot_unimem_event_full sbatch custom_unimem/sbatch_train.sh \
+CONFIG=pi05_astribot_unimem_event FAST=1 sbatch custom_unimem/sbatch_norm_stats.sh
+CONFIG=pi05_astribot_unimem_event sbatch custom_unimem/sbatch_train.sh \
     --exp-name=coffee_event_gate --num-train-steps=5000
-CONFIG=pi05_astribot_unimem_keyframe_full sbatch custom_unimem/sbatch_train.sh --exp-name=coffee_keyframe
+CONFIG=pi05_astribot_unimem_keyframe sbatch custom_unimem/sbatch_train.sh --exp-name=coffee_keyframe
 
-# without Slurm, straight on the box
+# without Slurm, straight on a GPU node
+export OPENPI_DATA_HOME=/mnt/data/dungnt232_1/openpi_cache   # see below
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 \
-  nohup uv run python custom_unimem/train.py pi05_astribot_unimem_keyframe_full \
+  nohup uv run python custom_unimem/train.py pi05_astribot_unimem_keyframe \
     --exp-name=coffee_keyframe --num-workers 12 --fsdp-devices 2 --no-wandb-enabled \
     > logs/keyframe_full.log 2>&1 &
 ```
+
+**`OPENPI_DATA_HOME`.** Every `gs://` asset openpi touches — the `pi05_base` weights the
+configs warm-start from, the PaliGemma tokenizer — resolves to
+`$OPENPI_DATA_HOME/<bucket>/<path>` (default `~/.cache/openpi`) and is downloaded on first
+use. The cluster's compute nodes have no internet, so a cold cache does not fail, it hangs.
+The cache at `/mnt/data/dungnt232_1/openpi_cache` is already populated
+(`openpi-assets/checkpoints/pi05_base/params`, `big_vision/paligemma_tokenizer.model`);
+`sbatch_*.sh` and `run_serve.sh` export it by default, the direct commands above must set
+it themselves. On the laptop leave it unset.
 
 `batch_size` must stay divisible by the GPU count and `fsdp_devices` must divide it
 evenly — `train.py` and `sharding.make_mesh` assert both. Per-device load of the `_full`
@@ -213,46 +223,49 @@ the same network, optimized in the same step as the flow-matching action loss:
 `Pi0.compute_loss_event` returns `action_loss + 0.1 * event_loss`, and `train.py` logs both
 so you can watch them independently. One config, one run, both objectives.
 
-The `_full` configs are the intended path — full fine-tuning of the whole backbone, no
-freeze filter, `ema_decay=0.999`, as the earlier non-memory bimanual policies on these
-robots were trained.
+The first three configs reproduce the paper's own real-robot recipe — every hyperparameter
+is `xarm_mem7_coruscant`'s, the config behind its hardware checkpoints. The last two are a
+deliberate departure (full fine-tune + EMA) for the 2x H100 node.
 
-> Where that departs from upstream: **every** UniMem config in this fork is a LoRA
-> fine-tune — all 34, the whole `libero_mem*`/`xarm_mem*` sweep plus the four
-> `unimem_example_*` templates — so the paper's own LIBERO and xArm checkpoints are LoRA.
-> Full FT appears there only as a comment ("drop `_lora` from both variants, >70GB"). On
-> 2x H100 that memory is available, so full is the default here; the `_lora` rows exist
-> only for a single 32 GB card.
+| config | recipe | model | GPU shape | what it is for |
+|--------|--------|-------|-----------|----------------|
+| `pi05_<robot>_unimem_keyframe` | **paper** | LoRA, events + keyframes (T=4) | bs 44, 1 GPU, 20k | **the headline config** — mirrors `xarm_mem7_coruscant` |
+| `pi05_<robot>_unimem_event` | **paper** | LoRA, events, single frame | bs 44, 1 GPU, 20k | **start here** — cheapest check that the labels are learnable |
+| `pi05_<robot>_unimem_video` | **paper** | LoRA, video (T=4 @ 2 s), no events | bs 44, 1 GPU, 20k | "does temporal context help at all" baseline — mirrors `xarm_mem7_video` |
+| `pi05_<robot>_unimem_keyframe_full` | departure | full FT + EMA, events + keyframes | bs 16, 2 GPUs, 30k | full-capacity version of the headline config |
+| `pi05_<robot>_unimem_event_full` | departure | full FT + EMA, events, single frame | bs 32, 2 GPUs, 30k | full-capacity single-frame |
 
-| config | model | data | GPU shape | what it tells you |
-|--------|-------|------|-----------|-------------------|
-| `pi05_<robot>_unimem_event_full` | event head, single frame, full FT | `BimanualEventDataConfig` | bs 32, 2 GPUs | **Start here**, with `--num-train-steps=5000`. Are the labels learnable? Watch `event_loss` fall. |
-| `pi05_<robot>_unimem_keyframe_full` | event head + keyframes (T=4), full FT | `BimanualEventKeyframeDataConfig` | bs 16, 2 GPUs | **the headline config** — text + visual event memory |
-| `pi05_<robot>_unimem_video_full` | fixed-stride video (T=6 @ 1 Hz), **no events** | `BimanualVideoDataConfig` | bs 16, 2 GPUs | the "does temporal context help at all" baseline — the direct translation of the older `use_mem_short_video` runs |
-| `pi05_<robot>_unimem_event_lora` | event head, single frame, LoRA | `BimanualEventDataConfig` | bs 32, 1 GPU | 32 GB fallback only |
-| `pi05_<robot>_unimem_keyframe_lora` | event head + keyframes, LoRA | `BimanualEventKeyframeDataConfig` | bs 8, 1 GPU | 32 GB fallback only |
+Every field of the three paper configs was diffed against `xarm_mem7_coruscant` and
+matches: `gemma_2b_lora` + `gemma_300m_lora`, `action_dim=32`, `action_horizon=50`,
+`max_token_len` left at the pi0.5 default of 200, `num_frames=4`, `ema_decay=None`,
+`batch_size=44`, `num_train_steps=20_000`, AdamW clipped at 1.0, cosine 2.5e-5 → 3.5e-6
+over 20k steps after a 1k warmup, `event_dropout_prob=0.0`, `text_dropout_prob=0.0`,
+`event_frame_window=30`, `stop_padding=False`, `save_interval=1_000`, `keep_period=10_000`,
+`log_interval=20`, freeze filter from the identical model config.
 
-Shared settings: π₀.₅, `action_dim=32`, `action_horizon=50`, `max_token_len=256`, constant
-5e-5 after a 1k-step warmup, AdamW with gradient clipping at 1.0,
-`phase_head_lr_multiplier=1.0`, `ema_decay=0.999` on the full fine-tunes (off for LoRA),
-W&B off, 300k steps with a checkpoint every 10k. All five start from `pi05_base`. 300k is
-an upper bound, not a target — these fine-tunes converge far earlier, so watch the loss
-and stop at a checkpoint.
-Batch sizes assume the image counts in the table (a keyframe sample carries 4 frames × 3
-cameras = 12 images against the single-frame configs' 3); halve on OOM.
+Three things the paper recipe cannot express on this robot, and why:
 
-Training-only regularization on the memory configs: `text_dropout_prob=0.2` (replace the
-history with `"History: none"`), `event_dropout_prob=0.2` on keyframes (zero out all event
-frames), and `event_frame_window=30` (draw the keyframe from the first second of an event
-rather than always frame 0, matching the spread in when the head fires at rollout). The
-two dropouts are drawn independently on purpose — without that, a policy that always gets
-both modalities together fails the moment one is missing.
+* **Three cameras, not two.** A keyframe sample carries 4 frames x 3 cameras = 12 images
+  rather than the xArm's 8 — 1.5x the ViT load at the same batch. Batch 44 is kept from
+  upstream anyway; halve it first if the node OOMs.
+* **16-dim bimanual actions.** `make_bool_mask(14, -2)` and `BimanualInputs`/`Outputs`
+  instead of the xArm's `(6, -1)` and `XarmInputs`.
+* **The prompt.** Upstream sets `prompt_from_task=True` and its episodes carry one task
+  string each, so every frame of an episode sees a constant instruction. Our annotated
+  datasets put the *per-frame subtask* in that field, so reading it would hand the policy
+  the very progress information event memory exists to supply. `default_prompt` reproduces
+  upstream's actual behaviour rather than its mechanism.
+
+Two knobs where upstream's *templates* and its *trained configs* disagree, and I followed
+the trained ones: `event_dropout_prob` and `text_dropout_prob` are 0.2 in the
+`unimem_example_*` templates but **0.0** in every `xarm_mem*_coruscant`. Raise
+`text_dropout_prob` toward 0.2 only if a single-modality ablation later fails.
 
 ### 4. Serve
 
 ```bash
-CONFIG=pi05_astribot_unimem_keyframe_full \
-MODEL_DIR=checkpoints/pi05_astribot_unimem_keyframe_full/coffee_keyframe/50000 \
+CONFIG=pi05_astribot_unimem_keyframe \
+MODEL_DIR=checkpoints/pi05_astribot_unimem_keyframe/coffee_keyframe/20000 \
     ./custom_unimem/run_serve.sh
 ```
 
@@ -281,7 +294,7 @@ that interpreter if it is missing.
 | `*_keyframe_*` | `text_keyframe` | current frame only + `phase_history`; `reset_cache` per rollout, `new_keyframe` after each detected event |
 | `*_keyframe_*` | `keyframe` | same, but the text pinned to `"History: none"` (visual-memory-only ablation) |
 | `*_event_*` | `text` | current frame + `phase_history`; no server cache involved |
-| `*_video_full` | `video` | the client stacks the last 6 frames at 30-frame spacing and sends the whole stack |
+| `*_video` | `video` | the client stacks the last 4 frames at 60-frame (2 s) spacing and sends the whole stack |
 | non-UniMem | `none` | no memory keys at all |
 
 Keyboard in the deploy terminal: **`r`** starts a new rollout (clears the event history and
@@ -315,6 +328,14 @@ default) doubles as the detection period — ~0.83 s at 30 Hz.
   intended angle.
 * **Event ids must be 0..10.** `Pi0` allocates 12 logits and reserves the last for the
   "unlabeled" bucket. `EventVocab` enforces this.
+* **EMA + event tracking crashed upstream.** `nnx.state(model)` is not all floats: the
+  event head's `nnx.Dropout` puts a `key<fry>` PRNG key and a `uint32` counter in the same
+  tree, and `train.py`'s EMA update multiplied *every* leaf by `ema_decay` — so any config
+  with `event_tracking=True` **and** `ema_decay` set died on step 1 with
+  `TypeError: multiply does not accept dtypes float32, key<fry>`. No upstream config hits
+  this (all 34 are LoRA with `ema_decay=None`), but every `_full` config here does. Fixed
+  by `training_utils.ema_update`, which averages float leaves and carries the rest
+  through; applied at all three EMA sites (`train.py`, `train_accum_steps.py` x2).
 * **`src/` patch.** `DataConfig.video_tolerance_s` (plus its one use in
   `data_loader.create_torch_dataset`) was restored from the earlier fork. These
   v2.1-converted datasets have video PTS shifted by up to one 30 fps frame period against

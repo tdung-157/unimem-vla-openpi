@@ -16,10 +16,10 @@ history and the policy server's visual-memory cache — through
 ``custom_unimem/unimem_client.py``. Set ``memory_mode`` to whatever the checkpoint was
 trained as; the modes are not interchangeable at serve time:
 
-    pi05_motion2_unimem_keyframe_*  ->  memory_mode:=text_keyframe   (default)
-    pi05_motion2_unimem_event_*     ->  memory_mode:=text
-    pi05_motion2_unimem_video_full  ->  memory_mode:=video
-    a non-UniMem checkpoint         ->  memory_mode:=none
+    pi05_motion2_unimem_keyframe[_full]  ->  memory_mode:=text_keyframe   (default)
+    pi05_motion2_unimem_event[_full]     ->  memory_mode:=text
+    pi05_motion2_unimem_video            ->  memory_mode:=video
+    a non-UniMem checkpoint              ->  memory_mode:=none
 
 Prerequisites
 -------------
@@ -116,11 +116,12 @@ GRIPPER_THRESHOLD = 0.5
 
 PATHS = robot_paths.MOTION2
 
-# Fixed-stride video baseline only: must match VIDEO_NUM_FRAMES / VIDEO_FRAME_STRIDE_SEC in
-# robot_configs.py (6 frames at 1 Hz over a 30 fps stream). A mismatch silently feeds the
-# model a clip with different temporal spacing than it trained on.
-DEFAULT_VIDEO_NUM_FRAMES = 6
-DEFAULT_VIDEO_STRIDE_FRAMES = 30
+# Fixed-stride video baseline only: must match VIDEO_NUM_FRAMES / VIDEO_FRAME_STRIDE_SEC
+# in robot_configs.py — 4 frames at a 2 s stride, which on a 30 fps stream is every 60th
+# frame (upstream's xarm_mem7_video layout). A mismatch silently feeds the model a clip
+# with different temporal spacing than it trained on.
+DEFAULT_VIDEO_NUM_FRAMES = 4
+DEFAULT_VIDEO_STRIDE_FRAMES = 60
 # Event-keyframe models: informational only (the server owns the cache depth), but logged
 # so a config/checkpoint mismatch is visible in the startup banner.
 DEFAULT_KEYFRAME_NUM_FRAMES = 4
@@ -169,6 +170,7 @@ class Motion2UniMemDeployNode(Node):
         self._tasks = deploy_common.load_tasks(str(p("tasks_file").value), self.get_logger().warning)
         self._task_index = 0
         self._prompt = self._tasks[0] if self._tasks else str(p("prompt").value)
+        self._check_prompt(self._prompt)
 
         vocab = event_vocab.get_vocab(PATHS.vocab)
         self.get_logger().info(f"Connecting to policy server ws://{host}:{port} (memory_mode={mode}) ...")
@@ -246,6 +248,22 @@ class Motion2UniMemDeployNode(Node):
     def stop(self) -> None:
         self._keys.stop()
 
+    def _check_prompt(self, prompt: str) -> None:
+        """Warn when the served prompt is not the one the checkpoint was trained on.
+
+        Every frame of training saw exactly one instruction (``robot_paths``' ``prompt``,
+        injected by ``default_prompt`` — the same single-string-per-episode behaviour
+        upstream gets from ``prompt_from_task=True`` on datasets whose task field is a
+        per-session constant). Sending anything else puts the model somewhere it has never
+        been, and it fails quietly rather than loudly, so say so.
+        """
+        if prompt != PATHS.prompt:
+            self.get_logger().warning(
+                f"prompt {prompt!r} differs from the trained prompt {PATHS.prompt!r}. "
+                "The policy was conditioned on one fixed instruction for every frame; "
+                "progress is supposed to reach it through phase_history, not the prompt."
+            )
+
     # ------------------------------------------------------------------ keyboard
     def _reset_rollout(self) -> None:
         self._policy.reset()
@@ -259,6 +277,7 @@ class Motion2UniMemDeployNode(Node):
             self._prompt = self._tasks[self._task_index]
             index, total, prompt = self._task_index + 1, len(self._tasks), self._prompt
         self._policy.set_prompt(prompt)
+        self._check_prompt(prompt)
         self.get_logger().info(f"[task {index}/{total}] prompt -> '{prompt}'")
 
     def _print_events(self) -> None:
@@ -275,6 +294,7 @@ class Motion2UniMemDeployNode(Node):
             if new_prompt and new_prompt != self._prompt:
                 self._prompt = new_prompt
                 self._policy.set_prompt(new_prompt)
+                self._check_prompt(new_prompt)
                 self.get_logger().info(f"Prompt updated via topic: '{new_prompt}'")
 
     def _decode_image(self, msg) -> np.ndarray:

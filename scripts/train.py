@@ -194,9 +194,7 @@ def train_step(
     if state.ema_decay is not None:
         new_state = dataclasses.replace(
             new_state,
-            ema_params=jax.tree.map(
-                lambda old, new: state.ema_decay * old + (1 - state.ema_decay) * new, state.ema_params, new_params
-            ),
+            ema_params=training_utils.ema_update(state.ema_params, new_params, state.ema_decay),
         )
 
     # Filter out params that aren't kernels.

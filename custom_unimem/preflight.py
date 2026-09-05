@@ -179,7 +179,7 @@ def check_norm_stats(report: Report, robot: str, dataset_frames: int) -> None:
         report(WARN, f"openpi not importable ({e}); skipping the norm-stats check")
         return
 
-    name = f"pi05_{robot}_unimem_event_full"
+    name = f"pi05_{robot}_unimem_event"
     config = _config.get_config(name)
     data_config = config.data.create(config.assets_dirs, config.model)
     if data_config.norm_stats is None:

@@ -1,6 +1,6 @@
 """Compute normalization statistics for a UniMem config.
 
-    uv run python custom_unimem/compute_norm_stats.py pi05_astribot_unimem_event_full \
+    uv run python custom_unimem/compute_norm_stats.py pi05_astribot_unimem_event \
         --max-frames 200000
 
 Two things this adds over the stock script:

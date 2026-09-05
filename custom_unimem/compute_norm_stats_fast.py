@@ -1,6 +1,6 @@
 """Norm stats straight from the parquet, skipping video decoding.
 
-    uv run python custom_unimem/compute_norm_stats_fast.py pi05_astribot_unimem_event_full --verify
+    uv run python custom_unimem/compute_norm_stats_fast.py pi05_astribot_unimem_event --verify
 
 Only ``state`` and ``actions`` go into norm stats, but the stock pipeline pulls every
 sample through the full data loader — which decodes the current frame (and, for keyframe

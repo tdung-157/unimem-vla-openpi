@@ -10,7 +10,7 @@
 #SBATCH --output=logs/unimem_norm_stats_%j.out
 #SBATCH --error=logs/unimem_norm_stats_%j.err
 #
-#   CONFIG=pi05_astribot_unimem_event_full sbatch custom_unimem/sbatch_norm_stats.sh
+#   CONFIG=pi05_astribot_unimem_event sbatch custom_unimem/sbatch_norm_stats.sh
 #
 # Norm stats depend only on state/actions, so ONE run per robot covers all five of that
 # robot's configs — compute_norm_stats.py copies the result into the shared assets
@@ -24,8 +24,14 @@ set -euo pipefail
 # Slurm copies this script to the node's spool dir, so BASH_SOURCE cannot locate the checkout.
 cd "${SLURM_SUBMIT_DIR:-/mnt/data/dungnt232_1/repos/unimem-vla-openpi}"
 
-CONFIG="${CONFIG:-pi05_astribot_unimem_event_full}"
+CONFIG="${CONFIG:-pi05_astribot_unimem_event}"
 echo "[norm_stats] $(hostname) $(date -Is) cwd=$PWD config=$CONFIG fast=${FAST:-0}"
+
+# Where openpi resolves gs:// assets. gs://openpi-assets/checkpoints/pi05_base/params maps to
+# $OPENPI_DATA_HOME/openpi-assets/checkpoints/pi05_base/params, which is already populated on
+# this cluster — the compute nodes have no internet, so without this the first step would
+# hang trying to fetch ~10 GB of base weights into ~/.cache/openpi.
+export OPENPI_DATA_HOME="${OPENPI_DATA_HOME:-/mnt/data/dungnt232_1/openpi_cache}"
 
 export PYTHONUNBUFFERED=1
 

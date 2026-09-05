@@ -4,10 +4,34 @@ from typing import Any
 from flax import nnx
 from flax import struct
 import jax
+import jax.numpy as jnp
 import optax
 
 from openpi.models import model as _model
 from openpi.shared import array_typing as at
+
+
+def ema_update(ema_params: at.Params, new_params: at.Params, decay: float) -> at.Params:
+    """EMA over the float leaves of a param tree, carrying every other leaf through.
+
+    `nnx.state(model)` is not purely float weights: a module holding an `nnx.Rngs` (the
+    event head's `nnx.Dropout` does) contributes a `key<fry>` PRNG key and a `uint32`
+    counter to the same tree. Multiplying those by `decay` raises
+    `TypeError: multiply does not accept dtypes float32, key<fry>`, so a plain
+    `jax.tree.map` over the whole tree only works for models whose state happens to be
+    all-float. Averaging RNG state would be meaningless anyway — the shadow copy takes
+    the live value.
+
+    Only reachable with `event_tracking=True` and `ema_decay` set, which is why upstream
+    (LoRA everywhere, `ema_decay=None`) never hit it.
+    """
+
+    def _update(old, new):
+        if not jnp.issubdtype(new.dtype, jnp.floating):
+            return new
+        return decay * old + (1 - decay) * new
+
+    return jax.tree.map(_update, ema_params, new_params)
 
 
 @at.typecheck

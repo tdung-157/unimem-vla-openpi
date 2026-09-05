@@ -1,16 +1,10 @@
-# Ordered prompts for the MOTION2 UniMem policy.
+# The prompt for the MOTION2 UniMem policy. See tasks_astribot.yaml — one entry, equal to
+# MOTION2's `prompt` in robot_paths.py.
 #
-# The deploy node feeds the CURRENT entry to the model as the language prompt; press 'c'
-# in its terminal to advance (wraps around).
-#
-# For a UniMem checkpoint this list should normally hold exactly ONE entry, matching
-# MOTION2_PROMPT in robot_paths.py. The whole point of event memory is that progress
-# through the task reaches the policy through `phase_history` and the keyframes, not
-# through an instruction that already names the current step — swapping the prompt
-# mid-episode puts the model somewhere it was never trained.
-#
-# The extra subtask strings are kept commented out for A/B-ing against a
-# subtask-conditioned (non-UniMem) checkpoint on the same robot.
+# The per-subtask strings below are NOT for a UniMem checkpoint: feeding them would put
+# the current step in the `Task:` slot, which is the information event memory exists to
+# supply. They are kept only for A/B-ing against a subtask-conditioned (non-UniMem)
+# policy on the same robot.
 tasks:
   - "get coffee, get ice, serve the drink"
   # - "Left arm pick the cup and place it under the coffee faucet"

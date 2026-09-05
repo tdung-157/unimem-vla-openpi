@@ -1,4 +1,12 @@
-# Ordered prompts for the Astribot UniMem policy. See tasks_motion2.yaml for why this
-# should normally be a single entry matching ASTRIBOT_PROMPT in robot_paths.py.
+# The prompt for the Astribot UniMem policy.
+#
+# ONE entry, and it must equal ASTRIBOT's `prompt` in robot_paths.py. Every frame of
+# training saw this exact string in the `Task:` slot; progress through the task reaches
+# the policy through `phase_history` and the keyframes, never through the instruction.
+# That is upstream's setup too — its datasets write one constant task string to every
+# frame, so `prompt_from_task=True` there resolves to a single instruction per episode.
+#
+# The deploy node warns if the active prompt differs from the trained one. Press 'c' to
+# cycle entries; with a single entry that is a no-op.
 tasks:
   - "Make an iced coffee"
